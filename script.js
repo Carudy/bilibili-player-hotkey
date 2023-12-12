@@ -10,13 +10,49 @@
 (function () {
     'use strict';
 
-    const vobj = document.querySelector('video');
+    // *********************************************************************************
+    // Functions
+    function poll_for_element(selector, callback = undefined, interval = 250, timeout = 5000) {
+        const startTime = Date.now();
+        const checkElement = () => {
+            const element = document.querySelector(selector);
+            if (element) {
+                if (typeof callback === "function") {
+                    callback(element);
+                } else {
+                    return element;
+                }
+            } else if (Date.now() - startTime < timeout) {
+                setTimeout(checkElement, interval);
+            } else {
+                console.warn(`Timeout reached while polling for element with selector "${selector}"`);
+            }
+        };
+        return checkElement();
+    }
 
+    const dlog = (message, fontSize = "1.25em") => {
+        const styles = [
+            `font-weight: bold`,
+            `font-size: ${fontSize || '16px'}`,
+            `color: brown`,
+        ];
+        message = 'user-dlog: ' + message;
+        console.log(`%c${message}`, styles.join(';'));
+    }
+
+    // *********************************************************************************
+    // Main Logic
     // If video not found, exit early
+    const { host } = location;
+    // const vobj = document.querySelector('video');
+    const vobj = poll_for_element('video');
+
     if (!vobj) {
         console.warn('Video element not found. Exiting script.');
         return;
     }
+    dlog('Script Loaded.')
 
     // Fullscreen toggle
     let is_full = false;
@@ -33,23 +69,37 @@
     const forward_step = 3;
 
     // Control actions dictionary
-    const controls = {
+    let controls = {
         'Enter': toggle_fs,
         'Shift+ArrowUp': () => vobj.playbackRate += play_rate_step,
         'Shift+ArrowDown': () => vobj.playbackRate -= play_rate_step,
         'Shift+Z': () => vobj.playbackRate = 1,
         'Space': () => vobj.paused ? vobj.play() : vobj.pause(),
-        // 'ArrowUp': () => vobj.volume = Math.min(vobj.volume + volume_step, 1),
-        // 'ArrowDown': () => vobj.volume = Math.max(vobj.volume - volume_step, 0),
-        // 'ArrowRight': () => vobj.currentTime += forward_step,
-        // 'ArrowLeft': () => vobj.currentTime = Math.max(0, vobj.currentTime - forward_step),
+        'ArrowUp': () => vobj.volume = Math.min(vobj.volume + volume_step, 1),
+        'ArrowDown': () => vobj.volume = Math.max(vobj.volume - volume_step, 0),
+        'ArrowRight': () => vobj.currentTime += forward_step,
+        'ArrowLeft': () => vobj.currentTime = Math.max(0, vobj.currentTime - forward_step),
     };
 
+    // *********************************************************************************
+    // Website-Wise Additional Func
+    // bilibili funcs
+    if (host.includes('bilibili')) {
+        poll_for_element('.bpx-player-ctrl-web', function (fpBtn) {
+            controls['Shift+Enter'] = () => { fpBtn.click.call(fpBtn) };
+        });
+        poll_for_element('.bpx-player-ctrl-wide-enter', function (btn) {
+            controls['Shift+T'] = () => { btn.click.call(btn); };
+        });
+    }
+
+    // *********************************************************************************
     // Event listener for keyup events
     document.addEventListener('keydown', function (event) {
         const key = (event.shiftKey ? 'Shift+' : '') + event.key;
         const action = controls[key];
         if (action && typeof action === 'function') {
+            dlog(key, ' pressed.');
             action();
         }
     });
